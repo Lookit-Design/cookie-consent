@@ -3,7 +3,7 @@
  * Plugin Name: Lookit Cookie Consent
  * Plugin URI:  https://lookitai.com
  * Description: Custom cookie consent popup for any site. Records consent directly to iubenda's Consent Database REST API — no iubenda frontend banner needed. Fully configurable from WordPress admin.
- * Version:     3.2.1
+ * Version:     3.2.2
  * Author:      Lookit AI
  * License:     GPL-2.0+
  * Requires at least: 5.9
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LOOKIT_CC_VERSION', '3.2.1' );
+define( 'LOOKIT_CC_VERSION', '3.2.2' );
 define( 'LOOKIT_CC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LOOKIT_CC_URL', plugin_dir_url( __FILE__ ) );
 
@@ -214,6 +214,9 @@ function lookit_cc_ajax_record() {
 
 /* ── Settings page ───────────────────────────────────────────────── */
 function lookit_cc_settings_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
 	$opts = lookit_cc_get_options();
 
 	/* First-run detection: show setup wizard if key fields are empty */
@@ -990,7 +993,8 @@ function lookit_cc_output() {
 		function setCookie(name, value, days) {
 			var d = new Date();
 			d.setTime(d.getTime() + days * 864e5);
-			document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+			var secure = (location.protocol === 'https:') ? ';Secure' : '';
+			document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax' + secure;
 		}
 		function getSubjectId() {
 			try {

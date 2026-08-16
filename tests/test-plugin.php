@@ -23,4 +23,13 @@ class Test_Lookit_Cookie_Consent_Settings extends WP_UnitTestCase {
 		$result = lookit_cc_sanitize( array( 'iubenda_public_key' => ' abc123 ' ) );
 		$this->assertSame( 'abc123', $result['iubenda_public_key'] );
 	}
+
+	public function test_settings_page_hidden_from_subscriber() {
+		$user = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user );
+		ob_start();
+		lookit_cc_settings_page();
+		$out = ob_get_clean();
+		$this->assertSame( '', $out );
+	}
 }
