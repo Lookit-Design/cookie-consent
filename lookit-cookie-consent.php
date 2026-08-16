@@ -6,7 +6,7 @@
  * Version:     3.2.1
  * Author:      Lookit AI
  * License:     GPL-2.0+
- * Requires at least: 5.8
+ * Requires at least: 5.9
  * Requires PHP: 7.4
  * Text Domain: lookit-cookie-consent
  */
