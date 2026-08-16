@@ -6,7 +6,7 @@
  * Version:     3.2.1
  * Author:      Lookit AI
  * License:     GPL-2.0+
- * Requires at least: 5.8
+ * Requires at least: 5.9
  * Requires PHP: 7.4
  * Text Domain: lookit-cookie-consent
  */
@@ -28,7 +28,15 @@ add_action(
 add_action(
 	'admin_init',
 	function () {
-		register_setting( 'lookit_cc_settings', 'lookit_cc_options', array( 'sanitize_callback' => 'lookit_cc_sanitize' ) );
+		register_setting(
+			'lookit_cc_settings',
+			'lookit_cc_options',
+			array(
+				'sanitize_callback' => 'lookit_cc_sanitize',
+				'autoload'          => false,
+			)
+		);
+		lookit_cc_maybe_disable_autoload();
 	}
 );
 
@@ -47,7 +55,13 @@ function lookit_cc_sanitize( $input ) {
 	$clean['logo_url']         = esc_url_raw( $input['logo_url'] ?? '' );
 	$clean['cookie_duration']  = absint( $input['cookie_duration'] ?? 365 );
 	// v2.5.0: iubenda Consent Database public API key
-	$clean['iubenda_public_key'] = sanitize_text_field( $input['iubenda_public_key'] ?? '' );
+	$submitted_key = sanitize_text_field( $input['iubenda_public_key'] ?? '' );
+	if ( '' === $submitted_key ) {
+		$existing                    = get_option( 'lookit_cc_options', array() );
+		$clean['iubenda_public_key'] = isset( $existing['iubenda_public_key'] ) ? $existing['iubenda_public_key'] : '';
+	} else {
+		$clean['iubenda_public_key'] = $submitted_key;
+	}
 	// v2.5.0: cookie policy ID (for legal_notices reference)
 	$clean['iubenda_policy_id'] = sanitize_text_field( $input['iubenda_policy_id'] ?? '' );
 	return $clean;
@@ -71,6 +85,16 @@ function lookit_cc_get_options() {
 		'iubenda_policy_id'  => '',
 	);
 	return wp_parse_args( get_option( 'lookit_cc_options', array() ), $defaults );
+}
+
+function lookit_cc_maybe_disable_autoload() {
+	$alloptions = wp_load_alloptions();
+	if ( ! isset( $alloptions['lookit_cc_options'] ) ) {
+		return;
+	}
+	$value = get_option( 'lookit_cc_options' );
+	delete_option( 'lookit_cc_options' );
+	add_option( 'lookit_cc_options', $value, '', false );
 }
 
 /* ── AJAX endpoint: proxy POST to iubenda Consent Database ─────── */
@@ -236,12 +260,23 @@ function lookit_cc_settings_page() {
 				<tr style="background:#f0f7ff;">
 					<th><label for="lookit_cc_pub_key">iubenda Public API Key</label></th>
 					<td>
-						<input id="lookit_cc_pub_key" type="text" name="lookit_cc_options[iubenda_public_key]"
-							value="<?php echo esc_attr( $opts['iubenda_public_key'] ); ?>"
-							class="large-text" placeholder="e.g. abc123xyz...">
+						<?php
+						$lookit_cc_key    = $opts['iubenda_public_key'];
+						$lookit_cc_masked = $lookit_cc_key ? '••••••••' . substr( $lookit_cc_key, -4 ) : '';
+						?>
+						<input id="lookit_cc_pub_key" type="password" name="lookit_cc_options[iubenda_public_key]"
+							value=""
+							class="large-text" autocomplete="off"
+							placeholder="<?php echo $lookit_cc_key ? esc_attr( 'Leave blank to keep the saved key' ) : esc_attr( 'e.g. abc123xyz...' ); ?>">
+						<?php if ( $lookit_cc_masked ) : ?>
+						<p class="description">
+							Currently set: <code><?php echo esc_html( $lookit_cc_masked ); ?></code>
+							&mdash; leave blank to keep it, or paste a new value to replace it.
+						</p>
+						<?php endif; ?>
 						<p class="description">
 							<strong>Where to find it:</strong> iubenda Dashboard &rarr; your site &rarr; Consent Database &rarr; <strong>Configure</strong> &rarr; <strong>Public API Key</strong>.<br>
-							This is your <em>public</em> key (write-only) — safe to use here. It records consent to iubenda's database without any frontend JS.
+							This is your <em>public</em> key (write-only) — used server-side only. It is never sent back to the browser.
 						</p>
 					</td>
 				</tr>
