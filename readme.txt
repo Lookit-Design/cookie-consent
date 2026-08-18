@@ -4,7 +4,7 @@ Tags: cookie, consent, iubenda, gdpr, ccpa
 Requires at least: 5.9
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 3.2.1
+Stable tag: 3.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,9 @@ This plugin connects to the iubenda Consent Database API (https://www.iubenda.co
 4. Add your iubenda public API key in the settings to enable consent recording
 
 == Changelog ==
+
+= 3.2.2 =
+* Set the Secure flag on the consent cookie over HTTPS, and require manage_options before rendering the settings screen.
 
 = 3.2.1 =
 * Plugin Check compliance pass: unified the text domain to the plugin slug, added a Text Domain header, escaped all front-end output, added wp_unslash()/sanitization to all input, switched to wp_safe_redirect(), guarded debug logging behind WP_DEBUG_LOG, added an External Services disclosure, aligned the readme name with the plugin header, and set Tested up to 7.0.
