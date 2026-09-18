@@ -32,4 +32,23 @@ class Test_Lookit_Cookie_Consent_Settings extends WP_UnitTestCase {
 		$out = ob_get_clean();
 		$this->assertSame( '', $out );
 	}
+
+	public function test_consent_subject_identifiers_are_bounded() {
+		$this->assertTrue( lookit_cc_is_valid_subject_id( 'anon-abc123-1789076884000' ) );
+		$this->assertTrue( lookit_cc_is_valid_subject_id( 'anon-abc123' ) );
+		$this->assertFalse( lookit_cc_is_valid_subject_id( 'customer@example.com' ) );
+		$this->assertFalse( lookit_cc_is_valid_subject_id( 'anon-' . str_repeat( 'a', 100 ) ) );
+	}
+
+	public function test_consent_requests_are_rate_limited_by_address() {
+		$ip  = '192.0.2.10';
+		$key = 'lookit_cc_rate_' . md5( $ip );
+		delete_transient( $key );
+
+		for ( $i = 0; $i < 10; $i++ ) {
+			$this->assertTrue( lookit_cc_consume_rate_limit( $ip ) );
+		}
+		$this->assertFalse( lookit_cc_consume_rate_limit( $ip ) );
+		delete_transient( $key );
+	}
 }
