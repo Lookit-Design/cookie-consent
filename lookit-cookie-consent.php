@@ -124,6 +124,12 @@ function lookit_cc_ajax_record() {
 	$accepted   = ( isset( $_POST['accepted'] ) && 'true' === sanitize_text_field( wp_unslash( $_POST['accepted'] ) ) );
 	$subject_id = isset( $_POST['subject_id'] ) ? sanitize_text_field( wp_unslash( $_POST['subject_id'] ) ) : '';
 	$ip         = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	if ( ! lookit_cc_is_valid_subject_id( $subject_id ) ) {
+		wp_send_json_error( 'Invalid subject identifier', 400 );
+	}
+	if ( ! lookit_cc_consume_rate_limit( $ip ) ) {
+		wp_send_json_error( 'Too many consent requests', 429 );
+	}
 
 	/* Parse granular preferences from Preferences tab toggles */
 	$raw_prefs  = isset( $_POST['preferences'] ) ? sanitize_text_field( wp_unslash( $_POST['preferences'] ) ) : '';
@@ -210,6 +216,32 @@ function lookit_cc_ajax_record() {
 		// Still succeed from user's perspective — our cookie is set
 		wp_send_json_success( array( 'warning' => 'API returned ' . $code ) );
 	}
+}
+
+function lookit_cc_is_valid_subject_id( $subject_id ) {
+	return 1 === preg_match( '/^anon-[a-z0-9]{1,9}(?:-[0-9]{10,16})?$/', (string) $subject_id );
+}
+
+function lookit_cc_consume_rate_limit( $ip ) {
+	$key    = 'lookit_cc_rate_' . md5( (string) $ip );
+	$state  = get_transient( $key );
+	$now    = time();
+	$window = 60;
+	$limit  = 10;
+
+	if ( ! is_array( $state ) || $now - (int) ( $state['started_at'] ?? 0 ) >= $window ) {
+		$state = array(
+			'started_at' => $now,
+			'count'      => 0,
+		);
+	}
+	if ( (int) $state['count'] >= $limit ) {
+		return false;
+	}
+
+	++$state['count'];
+	set_transient( $key, $state, $window );
+	return true;
 }
 
 /* ── Settings page ───────────────────────────────────────────────── */
@@ -351,6 +383,8 @@ function lookit_cc_settings_page() {
 						</p>
 					</td>
 				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Colors', 'lookit-cookie-consent' ); ?></th>
 					<td>
 						<label>Accent: <input type="color" name="lookit_cc_options[accent_color]" value="<?php echo esc_attr( $opts['accent_color'] ); ?>"></label>&nbsp;&nbsp;
 						<label>Background: <input type="color" name="lookit_cc_options[bg_color]" value="<?php echo esc_attr( $opts['bg_color'] ); ?>"></label>&nbsp;&nbsp;
@@ -511,8 +545,6 @@ function lookit_cc_output() {
 	$policy_id  = $opts['iubenda_policy_id'];
 	?>
 	<style id="lookit-cc-styles">
-	html, body { overflow: auto !important; height: auto !important; }
-
 	#iubenda-cs-banner, .iubenda-cs-container { display: none !important; }
 
 	/* v3.1.2: force-declare all classes so Remove Unused CSS keeps them */
@@ -1069,14 +1101,12 @@ function lookit_cc_output() {
 
 			fetch(AJAX_URL, { method: 'POST', body: formData })
 				.then(function(r) { return r.json(); })
-				.then(function() {
+				.then(function(data) {
+					if (!data.success) throw new Error('Consent was not recorded');
 					setCookie(COOKIE_NAME, accepted ? 'accepted' : 'rejected', DURATION);
 					hide();
 				})
-				.catch(function() {
-					setCookie(COOKIE_NAME, accepted ? 'accepted' : 'rejected', DURATION);
-					hide();
-				})
+				.catch(function() {})
 				.finally(function() { setButtonsLoading(false); });
 		}
 
